@@ -20,6 +20,8 @@ defmodule CortexCommunity.ModelSelector do
 
   @tick_interval_ms 60_000
   @daily_interval_ms 24 * 60 * 60 * 1000
+  # Health check every N ticks (5 min = 5 × 60s)
+  @health_check_every_ticks 5
 
   # Provider type → env var that holds the API key(s)
   @provider_env_keys %{
@@ -86,7 +88,8 @@ defmodule CortexCommunity.ModelSelector do
   def init(_opts) do
     state = %{
       last_health: %{},
-      discovery_done: false
+      discovery_done: false,
+      tick_count: 0
     }
 
     # Schedule initial discovery (give the app time to fully start)
@@ -101,8 +104,9 @@ defmodule CortexCommunity.ModelSelector do
     # Schedule next daily run
     Process.send_after(self(), :run_discovery, @daily_interval_ms)
 
-    # Start periodic health tick
+    # First boot: fire one health check right after discovery so status isn't :unknown
     unless state.discovery_done do
+      Process.send_after(self(), :health_check, 500)
       Process.send_after(self(), :tick, @tick_interval_ms)
     end
 
@@ -110,10 +114,23 @@ defmodule CortexCommunity.ModelSelector do
   end
 
   @impl true
+  def handle_info(:health_check, state) do
+    GenServer.cast(CortexCore.Workers.Pool, :check_health)
+    {:noreply, state}
+  end
+
+  @impl true
   def handle_info(:tick, state) do
+    tick_count = state.tick_count + 1
     new_state = do_health_tick(state)
+
+    # Trigger a Pool health check every @health_check_every_ticks (5 min)
+    if rem(tick_count, @health_check_every_ticks) == 0 do
+      GenServer.cast(CortexCore.Workers.Pool, :check_health)
+    end
+
     Process.send_after(self(), :tick, @tick_interval_ms)
-    {:noreply, new_state}
+    {:noreply, %{new_state | tick_count: tick_count}}
   end
 
   # --- Discovery ---
