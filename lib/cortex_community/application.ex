@@ -38,6 +38,9 @@ defmodule CortexCommunity.Application do
         type: :supervisor
       },
 
+      # Start model discovery + ranking selector
+      CortexCommunity.ModelSelector,
+
       # Start simple stats collector
       CortexCommunity.StatsCollector,
 
@@ -61,7 +64,10 @@ defmodule CortexCommunity.Application do
           :timer.sleep(500)
 
           try do
-            CortexCore.Workers.Supervisor.configure_initial_workers(CortexCore.Workers.Registry)
+            CortexCore.Workers.Supervisor.configure_initial_workers(
+              CortexCore.Workers.Registry,
+              model_resolver: &CortexCommunity.ModelSelector.get_model/1
+            )
           rescue
             e -> Logger.error("Failed to configure workers: #{inspect(e)}")
           end
