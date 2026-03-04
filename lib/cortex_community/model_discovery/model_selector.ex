@@ -238,7 +238,12 @@ defmodule CortexCommunity.ModelSelector do
     prompt = build_ranking_prompt(workers)
 
     case CortexCore.chat([%{"role" => "user", "content" => prompt}], []) do
-      {:ok, %{"content" => content}} ->
+      {:ok, stream} ->
+        content =
+          stream
+          |> Enum.filter(&is_binary/1)
+          |> Enum.join()
+
         parse_and_persist_rankings(content, workers)
 
       {:error, reason} ->
@@ -339,7 +344,10 @@ defmodule CortexCommunity.ModelSelector do
 
       Logger.info("LLM ranking generated: #{best}")
     else
-      _ -> Logger.warning("ModelSelector: could not parse LLM ranking response")
+      _ ->
+        Logger.warning(
+          "ModelSelector: could not parse LLM ranking response (raw: #{String.slice(content, 0, 200)})"
+        )
     end
   end
 
