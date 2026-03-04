@@ -2,6 +2,9 @@
 defmodule CortexCommunityWeb.HealthController do
   use CortexCommunityWeb, :controller
 
+  alias CortexCommunity.ModelDiscovery.ProviderModel
+  alias CortexCommunity.Repo
+
   @cortex_core Application.compile_env(:cortex_community, :cortex_core, CortexCore)
 
   @doc """
@@ -52,22 +55,120 @@ defmodule CortexCommunityWeb.HealthController do
   end
 
   @doc """
-  Detailed system health including stats
+  Full system status: workers, active models, fallback pool, task recommendations.
+  Designed for services to query before using Cortex.
   """
   def detailed(conn, _params) do
     health = @cortex_core.health_status()
+    workers = @cortex_core.list_workers()
     stats = CortexCommunity.StatsCollector.get_stats()
+    provider_models = Repo.all(ProviderModel)
+    rankings = CortexCommunity.ModelSelector.get_rankings()
+
+    pm_by_name = Map.new(provider_models, &{&1.worker_name, &1})
+
+    llm_workers =
+      workers
+      |> Enum.filter(&(&1.type in [:gemini, :anthropic, :openai, :groq, :cohere, :xai, :ollama]))
+      |> Enum.map(&build_worker_detail(&1, health, pm_by_name))
+
+    search_workers =
+      workers
+      |> Enum.filter(&(&1.type == :search))
+      |> Enum.map(&build_worker_detail(&1, health, pm_by_name))
+
+    available_llm = Enum.count(llm_workers, &(&1.status == "available"))
+    available_search = Enum.count(search_workers, &(&1.status == "available"))
+
+    recommendations = build_recommendations(rankings, health)
 
     json(conn, %{
-      health: health,
-      stats: stats,
-      system: %{
+      status: overall_status(available_llm),
+      gateway: %{
         version: Application.spec(:cortex_community, :vsn) |> to_string(),
         core_version: Application.spec(:cortex_core, :vsn) |> to_string(),
-        uptime_seconds: stats[:uptime_seconds] || 0,
+        uptime: format_uptime(stats[:uptime_seconds] || 0),
         memory_mb: div(:erlang.memory(:total), 1024 * 1024)
-      }
+      },
+      llm: %{
+        available: available_llm,
+        total: length(llm_workers),
+        workers: llm_workers
+      },
+      search: %{
+        available: available_search,
+        total: length(search_workers),
+        workers: search_workers
+      },
+      recommendations: recommendations,
+      timestamp: DateTime.utc_now()
     })
+  end
+
+  # --- Private ---
+
+  defp build_worker_detail(worker, health, pm_by_name) do
+    status = Map.get(health, worker.name, :unknown)
+    pm = Map.get(pm_by_name, worker.name)
+
+    base = %{
+      name: worker.name,
+      status: to_string(status),
+      model: Map.get(worker, :model) || Map.get(worker, :default_model)
+    }
+
+    if pm do
+      Map.merge(base, %{
+        fallback_models: length(pm.discovered_models),
+        last_discovery: pm.last_discovery_at
+      })
+    else
+      base
+    end
+  end
+
+  defp build_recommendations(rankings, health) do
+    task_types = ["chat", "coding", "reasoning", "tools", "long_context", "fast"]
+
+    Map.new(task_types, fn task ->
+      workers_list =
+        case Map.get(rankings, task) do
+          %{"workers" => list} -> list
+          _ -> []
+        end
+
+      # Find best available worker for this task
+      best =
+        Enum.find(workers_list, fn %{"worker" => w} ->
+          Map.get(health, w, :unknown) not in [:unavailable, :quota_exceeded]
+        end)
+
+      {task,
+       case best do
+         %{"worker" => w, "reason" => r} -> %{worker: w, reason: r}
+         _ -> nil
+       end}
+    end)
+  end
+
+  defp overall_status(0), do: "degraded"
+  defp overall_status(_), do: "ready"
+
+  defp format_uptime(seconds) do
+    days = div(seconds, 86_400)
+    hours = div(rem(seconds, 86_400), 3600)
+    minutes = div(rem(seconds, 3600), 60)
+
+    [
+      if(days > 0, do: "#{days}d"),
+      if(hours > 0, do: "#{hours}h"),
+      if(minutes > 0, do: "#{minutes}m")
+    ]
+    |> Enum.reject(&is_nil/1)
+    |> case do
+      [] -> "< 1m"
+      parts -> Enum.join(parts, " ")
+    end
   end
 end
 

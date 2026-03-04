@@ -325,9 +325,20 @@ defmodule CortexCommunity.ModelSelector do
       Enum.each(task_types, fn task_type ->
         workers_list = Map.get(rankings, task_type, [])
 
-        # Only keep workers that are actually active
+        # Normalize worker field: LLM sometimes returns "worker-name / model-id".
+        # Extract the known worker name if it appears anywhere in the value.
+        normalized_list =
+          Enum.map(workers_list, fn
+            %{"worker" => w} = entry ->
+              matched = Enum.find(worker_names, &String.contains?(w, &1))
+              if matched, do: %{entry | "worker" => matched}, else: entry
+
+            other ->
+              other
+          end)
+
         valid_list =
-          Enum.filter(workers_list, fn
+          Enum.filter(normalized_list, fn
             %{"worker" => w} -> w in worker_names
             _ -> false
           end)
