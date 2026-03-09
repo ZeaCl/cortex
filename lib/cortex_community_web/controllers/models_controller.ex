@@ -1,33 +1,9 @@
 defmodule CortexCommunityWeb.ModelsController do
   use CortexCommunityWeb, :controller
 
+  alias CortexCommunity.ModelDiscovery.ModelInfo
+
   @cortex_core Application.compile_env(:cortex_community, :cortex_core, CortexCore)
-
-  plug CortexCommunityWeb.Plugs.AuthenticateApiKey
-
-  # Ventanas de contexto conocidas por modelo (input/output en tokens)
-  @context_windows %{
-    # Anthropic Claude
-    "claude-sonnet-4-20250514" => %{input: 200_000, output: 64_000},
-    "claude-3.7-sonnet" => %{input: 200_000, output: 64_000},
-    "claude-3.5-haiku" => %{input: 200_000, output: 8_192},
-    # Google Gemini 3
-    "gemini-3-flash-preview" => %{input: 1_000_000, output: 65_536},
-    # Google Gemini 2.5 (legacy / referencia)
-    "gemini-2.5-flash" => %{input: 1_048_576, output: 65_535},
-    "gemini-2.5-flash-lite" => %{input: 1_048_576, output: 65_535},
-    # Groq / Meta LLaMA
-    "llama-3.1-8b-instant" => %{input: 128_000, output: 32_768},
-    "llama-3.3-70b-versatile" => %{input: 128_000, output: 32_768},
-    # OpenAI
-    "gpt-4o" => %{input: 128_000, output: 16_384},
-    "gpt-5" => %{input: 128_000, output: 16_384},
-    # xAI Grok
-    "grok-code-fast-1" => %{input: 131_072, output: 16_384},
-    # Cohere
-    "command-light" => %{input: 4_096, output: 4_096},
-    "command-r-plus" => %{input: 128_000, output: 4_096}
-  }
 
   # list_workers() already returns info maps (result of info/1), not structs
   @search_types [:search]
@@ -46,7 +22,7 @@ defmodule CortexCommunityWeb.ModelsController do
         name = info[:name] || info["name"]
         type = info[:type] || info["type"]
         model_name = info[:default_model] || info[:model] || info["model"]
-        ctx = if model_name, do: Map.get(@context_windows, to_string(model_name)), else: nil
+        ctx = ModelInfo.context_window(model_name && to_string(model_name))
         service = if type in @search_types, do: :search, else: :llm
 
         %{

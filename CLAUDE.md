@@ -147,3 +147,25 @@ Key environment variables:
 | `GET /docs` | ❌ | public HTML |
 
 Groq tool calling: must specify `model: "llama-3.3-70b-versatile"` (default returns empty [])
+
+### E2E Integration Tests (Playwright)
+
+Tests que validan el stack completo: assistant UI ↔ cortex gateway.
+Viven en: `../assistant/e2e/` (repo del assistant)
+
+**Prerequisito**: Cortex corriendo en `:4000`. El assistant lo arranca Playwright automáticamente en `:4001`.
+
+**Correr**:
+```bash
+cd /ruta/al/assistant/e2e
+npm run test:e2e -- --project integration   # solo integración (Chromium, ~2 min)
+npm run test:e2e                            # suite completa (todos los browsers)
+```
+
+**Tests** (`e2e/tests/cortex-integration.spec.ts`):
+- INTEG-001..005: Chat round-trip, streaming, stop, estado limpio, respuesta no vacía
+- INTEG-006..007: Nueva conversación, contexto multi-turno
+- INTEG-008..009: Cortex health API (estructura + workers)
+- INTEG-010: Markdown rendering (bloques de código)
+
+**Cuándo correr**: Después de modificar cortex↔assistant (streaming, error handling, health endpoints).

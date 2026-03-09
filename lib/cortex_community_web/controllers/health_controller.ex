@@ -2,7 +2,7 @@
 defmodule CortexCommunityWeb.HealthController do
   use CortexCommunityWeb, :controller
 
-  alias CortexCommunity.ModelDiscovery.ProviderModel
+  alias CortexCommunity.ModelDiscovery.{ModelInfo, ProviderModel}
   alias CortexCommunity.Repo
 
   @cortex_core Application.compile_env(:cortex_community, :cortex_core, CortexCore)
@@ -111,10 +111,13 @@ defmodule CortexCommunityWeb.HealthController do
     status = Map.get(health, worker.name, :unknown)
     pm = Map.get(pm_by_name, worker.name)
 
+    model = Map.get(worker, :model) || Map.get(worker, :default_model)
+
     base = %{
       name: worker.name,
       status: to_string(status),
-      model: Map.get(worker, :model) || Map.get(worker, :default_model)
+      model: model,
+      context_window: ModelInfo.context_window(model && to_string(model))
     }
 
     if pm do

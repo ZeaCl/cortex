@@ -233,11 +233,21 @@ defmodule CortexCommunityWeb.ChatController do
   end
 
   defp send_sse_done(conn, ratelimit_info) do
+    model = Map.get(ratelimit_info, "model")
+    worker = Map.get(ratelimit_info, "worker")
+    failover = Map.get(ratelimit_info, "failover", [])
+    clean_info = Map.drop(ratelimit_info, ["model", "worker", "failover"])
+
+    base = %{"done" => true}
+    base = if is_binary(model) and model != "", do: Map.put(base, "model", model), else: base
+    base = if is_binary(worker) and worker != "", do: Map.put(base, "worker", worker), else: base
+    base = if failover != [], do: Map.put(base, "failover", failover), else: base
+
     payload =
-      if map_size(ratelimit_info) > 0 do
-        Jason.encode!(%{"done" => true, "ratelimit" => ratelimit_info})
+      if map_size(clean_info) > 0 do
+        Jason.encode!(Map.put(base, "ratelimit", clean_info))
       else
-        "{\"done\": true}"
+        Jason.encode!(base)
       end
 
     case Plug.Conn.chunk(conn, "event: done\ndata: #{payload}\n\n") do
