@@ -6,8 +6,8 @@ import chalk from 'chalk';
 const program = new Command();
 
 program
-  .name('zea-cortex')
-  .description('Cortex Infrastructure & Worker Management CLI')
+  .name('zea-gateway')
+  .description('ZEA AI Gateway (Cortex) Infrastructure CLI')
   .version('1.0.0');
 
 program
