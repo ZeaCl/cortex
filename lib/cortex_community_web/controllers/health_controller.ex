@@ -69,7 +69,7 @@ defmodule CortexCommunityWeb.HealthController do
 
     llm_workers =
       workers
-      |> Enum.filter(&(&1.type in [:gemini, :anthropic, :openai, :groq, :cohere, :xai, :ollama]))
+      |> Enum.filter(&(&1.type in [:gemini, :anthropic, :openai, :groq, :cohere, :xai, :ollama, :qwen_oauth]))
       |> Enum.map(&build_worker_detail(&1, health, pm_by_name))
 
     search_workers =
@@ -112,12 +112,14 @@ defmodule CortexCommunityWeb.HealthController do
     pm = Map.get(pm_by_name, worker.name)
 
     model = Map.get(worker, :model) || Map.get(worker, :default_model)
+    caps = CortexCore.Workers.Pool.get_capabilities(worker.name) |> Enum.map(&to_string/1)
 
     base = %{
       name: worker.name,
       status: to_string(status),
       model: model,
-      context_window: ModelInfo.context_window(model && to_string(model))
+      context_window: ModelInfo.context_window(model && to_string(model)),
+      capabilities: caps
     }
 
     if pm do

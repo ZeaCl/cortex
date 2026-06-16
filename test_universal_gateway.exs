@@ -24,23 +24,27 @@ end)
 # 3. Health Status
 IO.puts("\n=== Health Status ===")
 health = CortexCore.health_status()
+
 Enum.each(health, fn {name, status} ->
-  emoji = case status do
-    :available -> "✅"
-    :unavailable -> "❌"
-    _ -> "⚠️"
-  end
+  emoji =
+    case status do
+      :available -> "✅"
+      :unavailable -> "❌"
+      _ -> "⚠️"
+    end
+
   IO.puts("#{emoji} #{name}: #{status}")
 end)
 
 # 4. Test Web Search (Tavily)
 IO.puts("\n=== Testing Web Search (Tavily) ===")
+
 case CortexCore.call(:search, %{
-  query: "What is Elixir programming language?",
-  max_results: 3,
-  search_depth: "basic",
-  include_answer: true
-}) do
+       query: "What is Elixir programming language?",
+       max_results: 3,
+       search_depth: "basic",
+       include_answer: true
+     }) do
   {:ok, results} ->
     IO.puts("✅ Search successful!")
     IO.puts("\nQuery: #{results.query}")
@@ -51,7 +55,9 @@ case CortexCore.call(:search, %{
     end
 
     IO.puts("\n🔍 Results (#{length(results.results)}):")
-    Enum.take(results.results, 2) |> Enum.each(fn result ->
+
+    Enum.take(results.results, 2)
+    |> Enum.each(fn result ->
       IO.puts("\n  • #{result["title"]}")
       IO.puts("    #{result["url"]}")
     end)
@@ -66,9 +72,10 @@ end
 
 # 5. Test LLM (backward compatibility)
 IO.puts("\n=== Testing LLM Chat (backward compatibility) ===")
+
 case CortexCore.chat([
-  %{role: "user", content: "Say 'Hello from Universal Gateway' in one sentence"}
-]) do
+       %{role: "user", content: "Say 'Hello from Universal Gateway' in one sentence"}
+     ]) do
   {:ok, stream} ->
     IO.write("🤖 Response: ")
     stream |> Enum.take(100) |> Enum.each(&IO.write/1)
@@ -82,6 +89,7 @@ case CortexCore.chat([
 end
 
 IO.puts("\n=== Test Complete ===")
+
 IO.puts("""
 
 ✨ Universal Service Gateway is working in cortex_community!

@@ -24,6 +24,7 @@ defmodule CortexCommunityWeb.ModelsController do
         model_name = info[:default_model] || info[:model] || info["model"]
         ctx = ModelInfo.context_window(model_name && to_string(model_name))
         service = if type in @search_types, do: :search, else: :llm
+        caps = CortexCore.Workers.Pool.get_capabilities(name) |> Enum.map(&to_string/1)
 
         %{
           id: name,
@@ -32,7 +33,7 @@ defmodule CortexCommunityWeb.ModelsController do
           model: model_name,
           status: Map.get(health, name, :unknown),
           context_window: ctx,
-          capabilities: info[:capabilities] || [],
+          capabilities: caps,
           how_to_use: usage_instructions(name, service)
         }
       end)

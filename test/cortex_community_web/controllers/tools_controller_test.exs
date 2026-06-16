@@ -113,9 +113,9 @@ defmodule CortexCommunityWeb.ToolsControllerTest do
       :ok
     end
 
-    test "returns 400 when provider is not specified", %{conn: conn} do
+    test "returns 503 when no workers have tools capability", %{conn: conn} do
       expect(CortexCore.Mock, :call_with_tools, fn _messages, _tools, _opts ->
-        {:error, :no_provider_specified}
+        {:error, :no_workers_available}
       end)
 
       conn =
@@ -126,8 +126,27 @@ defmodule CortexCommunityWeb.ToolsControllerTest do
           "tools" => @valid_tools
         })
 
+      assert json = json_response(conn, 503)
+      assert json["message"] =~ "tool calling"
+    end
+
+    test "returns 400 when provider lacks tools capability", %{conn: conn} do
+      expect(CortexCore.Mock, :call_with_tools, fn _messages, _tools, _opts ->
+        {:error, {:worker_lacks_capability, "cohere-primary", :tools}}
+      end)
+
+      conn =
+        conn
+        |> with_auth()
+        |> post(~p"/api/tools", %{
+          "messages" => @valid_messages,
+          "tools" => @valid_tools,
+          "provider" => "cohere-primary"
+        })
+
       assert json = json_response(conn, 400)
-      assert json["message"] =~ "provider"
+      assert json["message"] =~ "cohere-primary"
+      assert json["message"] =~ "tool calling"
     end
 
     test "returns 404 when provider is not found", %{conn: conn} do

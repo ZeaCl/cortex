@@ -84,9 +84,14 @@
         "type": "object",
         "properties": {
           "name": { "type": "string" },
-          "status": { "type": "string", "enum": ["available", "unavailable", "rate_limited"] },
+          "status": { "type": "string", "enum": ["available", "unavailable", "rate_limited", "unknown"] },
           "type": { "type": "string" },
-          "api_keys_count": { "type": "integer" }
+          "api_keys_count": { "type": "integer" },
+          "capabilities": {
+            "type": "array",
+            "items": { "type": "string", "enum": ["chat", "tools", "long_context", "vision", "fast", "reasoning", "search"] },
+            "description": "Declared capabilities for this worker. Workers with 'tools' support function calling."
+          }
         }
       },
       "Error": {
@@ -252,7 +257,7 @@
     "/api/tools": {
       "post": {
         "summary": "Function calling / structured extraction",
-        "description": "Ejecuta function calling. Devuelve las tool_calls sin streaming. Requiere `provider` explícito — usa 'gemini-primary' como default.",
+        "description": "Ejecuta function calling. Devuelve las tool_calls sin streaming. `provider` es opcional — sin él, Cortex auto-selecciona entre workers con soporte :tools (gemini, groq, anthropic, openai). Especificar un worker sin soporte tools retorna 400.",
         "security": [{ "BearerAuth": [] }],
         "requestBody": {
           "required": true,
@@ -260,7 +265,7 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["messages", "tools", "provider"],
+                "required": ["messages", "tools"],
                 "properties": {
                   "messages": {
                     "type": "array",
@@ -272,7 +277,7 @@
                   },
                   "provider": {
                     "type": "string",
-                    "description": "Worker a usar. Requerido. Default recomendado: 'gemini-primary'.",
+                    "description": "Opcional. Worker específico a usar (debe tener capacidad :tools). Sin este campo, Cortex auto-selecciona con failover.",
                     "example": "gemini-primary"
                   },
                   "tool_choice": {

@@ -10,7 +10,8 @@ defmodule CortexCommunityWeb.ToolsController do
   Tool use / function calling endpoint.
 
   Accepts OpenAI-compatible tool definitions and returns structured tool_calls.
-  Requires explicit provider selection (no auto-routing for tool use).
+  Provider is optional — omitting it auto-routes to any worker with :tools capability.
+  Specifying a provider that lacks :tools capability returns 400.
   """
   def create(conn, %{"messages" => messages, "tools" => tools} = params)
       when is_list(messages) and is_list(tools) do
@@ -18,27 +19,33 @@ defmodule CortexCommunityWeb.ToolsController do
     tool_choice = params["tool_choice"]
 
     opts =
-      [provider: provider]
+      []
+      |> maybe_add_opt(:provider, provider)
       |> maybe_add_opt(:tool_choice, tool_choice)
       |> maybe_add_opt(:model, params["model"])
 
     Logger.info(
-      "Tool use request: provider=#{provider}, tools=#{length(tools)}, messages=#{length(messages)}"
+      "Tool use request: provider=#{provider || "auto"}, tools=#{length(tools)}, messages=#{length(messages)}"
     )
 
     case @cortex_core.call_with_tools(messages, tools, opts) do
       {:ok, tool_calls} ->
         json(conn, %{ok: true, tool_calls: tool_calls})
 
-      {:error, :no_provider_specified} ->
+      {:error, {:worker_lacks_capability, name, :tools}} ->
         conn
         |> put_status(400)
-        |> json(%{error: true, message: "Field 'provider' is required for tool use"})
+        |> json(%{error: true, message: "Worker '#{name}' does not support tool calling"})
 
       {:error, {:provider_not_found, name}} ->
         conn
         |> put_status(404)
         |> json(%{error: true, message: "Worker '#{name}' not found"})
+
+      {:error, :no_workers_available} ->
+        conn
+        |> put_status(503)
+        |> json(%{error: true, message: "No workers available with tool calling support"})
 
       {:error, :rate_limited} ->
         conn

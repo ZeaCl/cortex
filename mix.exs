@@ -8,7 +8,7 @@ defmodule CortexCommunity.MixProject do
     [
       app: :cortex_community,
       version: @version,
-      elixir: "~> 1.15",
+      elixir: "~> 1.19",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
@@ -44,9 +44,7 @@ defmodule CortexCommunity.MixProject do
   defp deps do
     [
       # Core AI functionality
-      # {:cortex_core, "~> 1.0.2"},
-      # Or for local development:
-      {:cortex_core, path: "../cortex-core/cortex_core"},
+      {:cortex_core, path: "./core"},
 
       # Phoenix Framework
       {:phoenix, "~> 1.7.10"},

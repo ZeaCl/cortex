@@ -1,5 +1,5 @@
 # Dockerfile
-FROM elixir:1.16-alpine AS build
+FROM elixir:1.19-alpine AS build
 
 # Install build dependencies
 RUN apk add --no-cache build-base git npm
@@ -10,36 +10,40 @@ WORKDIR /app
 RUN mix local.hex --force && \
     mix local.rebar --force
 
-# Copy mix files
-COPY mix.exs mix.lock ./
-COPY config config
+# Copy path dependencies and main app mix files
+COPY cortex-core/ /app/cortex-core/
+COPY cortex_community/mix.exs cortex_community/mix.lock /app/cortex_community/
+
+WORKDIR /app/cortex_community
+
+# Set environment
+ENV MIX_ENV=prod
 
 # Install dependencies
 RUN mix deps.get --only prod && \
     mix deps.compile
 
 # Copy source code
-COPY lib lib
-COPY priv priv
+COPY cortex_community/lib /app/cortex_community/lib
+COPY cortex_community/priv /app/cortex_community/priv
+COPY cortex_community/config /app/cortex_community/config
 
 # Copy assets and build them
-COPY assets assets
-RUN cd assets && npm install && cd ..
+COPY cortex_community/assets /app/cortex_community/assets
 RUN mix assets.deploy
 
 # Build release
-ENV MIX_ENV=prod
 RUN mix release
 
 # Runtime stage
-FROM alpine:3.18
+FROM alpine:3.23
 
 RUN apk add --no-cache libstdc++ openssl ncurses-libs
 
 WORKDIR /app
 
 # Copy release from build stage
-COPY --from=build /app/_build/prod/rel/cortex_community ./
+COPY --from=build /app/cortex_community/_build/prod/rel/cortex_community ./
 
 # Create non-root user
 RUN addgroup -g 1000 cortex && \

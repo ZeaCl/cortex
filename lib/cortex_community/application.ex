@@ -68,6 +68,10 @@ defmodule CortexCommunity.Application do
               CortexCore.Workers.Registry,
               model_resolver: &CortexCommunity.ModelSelector.get_model/1
             )
+
+            configure_worker_capabilities()
+            maybe_register_anthropic_oauth_worker()
+            maybe_register_qwen_oauth_worker()
           rescue
             e -> Logger.error("Failed to configure workers: #{inspect(e)}")
           end
@@ -92,6 +96,129 @@ defmodule CortexCommunity.Application do
   def config_change(changed, _new, removed) do
     CortexCommunityWeb.Endpoint.config_change(changed, removed)
     :ok
+  end
+
+  @worker_capabilities %{
+    "anthropic-primary" => [:chat, :tools, :reasoning],
+    "anthropic-oauth-local" => [:chat, :tools, :reasoning],
+    "gemini-primary" => [:chat, :tools, :long_context, :vision],
+    "gemini-pro-25-primary" => [:chat, :tools, :long_context, :vision],
+    "groq-primary" => [:chat, :tools, :fast],
+    "openai-primary" => [:chat, :tools, :vision],
+    "qwen-oauth-local" => [:chat, :tools, :vision, :fast],
+    "xai-primary" => [:chat],
+    "cohere-primary" => [:chat],
+    "ollama-local" => [:chat],
+    "tavily-primary" => [:search],
+    "serper-primary" => [:search],
+    "brave-primary" => [:search],
+    "pubmed-primary" => [:search],
+    "duckduckgo-primary" => [:search]
+  }
+
+  defp configure_worker_capabilities do
+    pool = CortexCore.Workers.Pool
+
+    Enum.each(@worker_capabilities, fn {worker_name, caps} ->
+      CortexCore.Workers.Pool.set_capabilities(pool, worker_name, caps)
+    end)
+
+    Logger.info("Worker capabilities configured")
+  end
+
+  defp maybe_register_anthropic_oauth_worker do
+    alias CortexCommunity.Auth.ClaudeCliReader
+    alias CortexCommunity.Workers.AnthropicOAuthWorker
+
+    case ClaudeCliReader.read_credentials() do
+      {:ok, creds} ->
+        if ClaudeCliReader.valid?(creds) do
+          worker =
+            AnthropicOAuthWorker.new(
+              name: "anthropic-oauth-local",
+              credentials: creds,
+              timeout: 60_000
+            )
+
+          case CortexCore.Workers.Registry.register(
+                 CortexCore.Workers.Registry,
+                 "anthropic-oauth-local",
+                 worker
+               ) do
+            :ok ->
+              CortexCore.Workers.Pool.set_capabilities(
+                CortexCore.Workers.Pool,
+                "anthropic-oauth-local",
+                [:chat, :tools, :reasoning]
+              )
+
+              Logger.info("✅ anthropic-oauth-local registered (Claude Pro Max)")
+
+            {:error, :already_registered} ->
+              Logger.debug("anthropic-oauth-local already registered")
+
+            error ->
+              Logger.warning("Could not register anthropic-oauth-local: #{inspect(error)}")
+          end
+        else
+          Logger.warning(
+            "Claude OAuth credentials expired — anthropic-oauth-local not registered"
+          )
+        end
+
+      {:error, :not_found} ->
+        Logger.debug("No Claude CLI credentials found — skipping anthropic-oauth-local")
+
+      {:error, reason} ->
+        Logger.warning("Could not read Claude credentials: #{inspect(reason)}")
+    end
+  end
+
+  defp maybe_register_qwen_oauth_worker do
+    alias CortexCommunity.Auth.QwenCredentialReader
+    alias CortexCommunity.Workers.QwenOAuthWorker
+
+    case QwenCredentialReader.read_credentials() do
+      {:ok, creds} ->
+        if QwenCredentialReader.valid?(creds) do
+          worker =
+            QwenOAuthWorker.new(
+              name: "qwen-oauth-local",
+              access_token: creds.access_token,
+              resource_url: creds.resource_url,
+              timeout: 30_000
+            )
+
+          case CortexCore.Workers.Registry.register(
+                 CortexCore.Workers.Registry,
+                 "qwen-oauth-local",
+                 worker
+               ) do
+            :ok ->
+              CortexCore.Workers.Pool.set_capabilities(
+                CortexCore.Workers.Pool,
+                "qwen-oauth-local",
+                [:chat, :tools, :vision, :fast]
+              )
+
+              Logger.info("✅ qwen-oauth-local registered (Qwen Code)")
+
+            {:error, :already_registered} ->
+              Logger.debug("qwen-oauth-local already registered")
+
+            error ->
+              Logger.warning("Could not register qwen-oauth-local: #{inspect(error)}")
+          end
+        else
+          Logger.warning("Qwen OAuth credentials expired — qwen-oauth-local not registered")
+        end
+
+      {:error, :not_found} ->
+        Logger.debug("No Qwen credentials found — skipping qwen-oauth-local")
+
+      {:error, reason} ->
+        Logger.warning("Could not read Qwen credentials: #{inspect(reason)}")
+    end
   end
 
   defp configure_cortex do
