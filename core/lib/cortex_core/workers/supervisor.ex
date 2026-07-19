@@ -20,6 +20,7 @@ defmodule CortexCore.Workers.Supervisor do
     DuckDuckGoWorker,
     GeminiWorker,
     GroqWorker,
+    MLXWorker,
     OllamaWorker,
     OpenAIEmbeddingsWorker,
     OpenAIWorker,
@@ -124,6 +125,9 @@ defmodule CortexCore.Workers.Supervisor do
   defp create_worker(:duckduckgo, name, opts),
     do: DuckDuckGoWorker.new(Keyword.put(opts, :name, name))
 
+  defp create_worker(:mlx, name, opts),
+    do: MLXWorker.new(Keyword.put(opts, :name, name))
+
   defp create_worker(_, _name, _opts), do: {:error, :unsupported_worker_type}
 
   @doc """
@@ -168,6 +172,7 @@ defmodule CortexCore.Workers.Supervisor do
       |> maybe_add_gemini_worker(model_resolver)
       |> maybe_add_cohere_worker(model_resolver)
       |> maybe_add_ollama_worker()
+      |> maybe_add_mlx_worker()
       # Embeddings Workers
       |> maybe_add_openai_embeddings_worker()
       # Search Workers
@@ -424,8 +429,40 @@ defmodule CortexCore.Workers.Supervisor do
     end
   end
 
+  defp maybe_add_mlx_worker(workers) do
+    mlx_url = System.get_env("MLX_BASE_URL", "http://localhost:8000")
+    mlx_model = System.get_env("MLX_MODEL", "mlx-text")
+
+    # Verificar si zea/models está corriendo
+    case check_mlx_availability(mlx_url) do
+      true ->
+        worker =
+          MLXWorker.new(
+            name: "mlx-local",
+            base_url: mlx_url,
+            default_model: mlx_model,
+            timeout: 60_000
+          )
+
+        [{"mlx-local", worker} | workers]
+
+      false ->
+        Logger.warning("MLX (zea/models) no disponible en #{mlx_url}")
+        workers
+    end
+  end
+
   defp check_ollama_availability(base_url) do
     case Req.get(base_url <> "/api/tags", receive_timeout: 2000, retry: false) do
+      {:ok, %{status: 200}} -> true
+      _ -> false
+    end
+  rescue
+    _ -> false
+  end
+
+  defp check_mlx_availability(base_url) do
+    case Req.get(base_url <> "/health", receive_timeout: 2000, retry: false) do
       {:ok, %{status: 200}} -> true
       _ -> false
     end

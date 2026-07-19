@@ -146,6 +146,7 @@ defmodule CortexCore.ModelDiscovery do
 
   def list_models(:cohere, _api_key), do: {:ok, @cohere_models}
   def list_models(:xai, _api_key), do: {:ok, @xai_models}
+  def list_models(:mlx, _api_key), do: {:ok, ["mlx-vision", "mlx-text"]}
 
   def list_models(provider, _api_key) do
     Logger.warning("ModelDiscovery: unknown provider #{inspect(provider)}, skipping")
