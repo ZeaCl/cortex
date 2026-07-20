@@ -31,7 +31,6 @@ defmodule CortexCommunityWeb.Plugs.AuthenticateApiKey do
   require Logger
 
   alias CortexCommunity.Auth.AuthManager
-  @users Application.compile_env(:cortex_community, :users_module, CortexCommunity.Users)
 
   def init(opts), do: opts
 

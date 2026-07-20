@@ -26,6 +26,8 @@ defmodule CortexCommunity.Auth.ThalamusClient do
       end
   """
 
+  require Logger
+
   @table_name :thalamus_introspect_cache
   @timeout 5_000
 
@@ -64,22 +66,21 @@ defmodule CortexCommunity.Auth.ThalamusClient do
   # ---------------------------------------------------------------------------
 
   defp ensure_table! do
-    if :ets.whereis(@table_name) == :undefined do
-      :ets.new(@table_name, [:named_table, :set, :public, read_concurrency: true])
-    end
-
+    :ets.new(@table_name, [:named_table, :set, :public, read_concurrency: true])
     :ok
   rescue
     ArgumentError -> :ok
   end
 
   defp lookup(token) do
-    case :ets.lookup(@table_name, token) do
-      [{^token, claims, expires_at}] ->
+    key = cache_key(token)
+
+    case :ets.lookup(@table_name, key) do
+      [{^key, claims, expires_at}] ->
         if DateTime.compare(DateTime.utc_now(), expires_at) == :lt do
           {:ok, claims}
         else
-          :ets.delete(@table_name, token)
+          :ets.delete(@table_name, key)
           :miss
         end
 
@@ -91,8 +92,14 @@ defmodule CortexCommunity.Auth.ThalamusClient do
   defp cache(token, claims) do
     ttl = cache_ttl()
     expires_at = DateTime.add(DateTime.utc_now(), ttl, :second)
-    :ets.insert(@table_name, {token, claims, expires_at})
+    key = cache_key(token)
+    :ets.insert(@table_name, {key, claims, expires_at})
     :ok
+  end
+
+  # Hash the token for the ETS key — avoids storing raw JWTs in memory
+  defp cache_key(token) do
+    :crypto.hash(:sha256, token) |> Base.encode16(case: :lower)
   end
 
   # ---------------------------------------------------------------------------
@@ -136,8 +143,18 @@ defmodule CortexCommunity.Auth.ThalamusClient do
   end
 
   defp decode_body(body) when is_map(body), do: body
-  defp decode_body(body) when is_binary(body), do: Jason.decode!(body)
-  defp decode_body(_), do: %{}
+
+  defp decode_body(body) when is_binary(body) do
+    case Jason.decode(body) do
+      {:ok, decoded} -> decoded
+      {:error, _} -> %{"active" => false}
+    end
+  end
+
+  defp decode_body(other) do
+    Logger.debug("Unexpected introspect response body type: #{inspect(other)}")
+    %{"active" => false}
+  end
 
   # ---------------------------------------------------------------------------
   # Private — configuration
@@ -155,6 +172,8 @@ defmodule CortexCommunity.Auth.ThalamusClient do
 
   defp client_credentials do
     auth_config = Application.get_env(:cortex_community, :auth, [])
-    {Keyword.get(auth_config, :thalamus_client_id), Keyword.get(auth_config, :thalamus_client_secret)}
+    id = Keyword.get(auth_config, :thalamus_client_id, "")
+    secret = Keyword.get(auth_config, :thalamus_client_secret, "")
+    {id, secret}
   end
 end

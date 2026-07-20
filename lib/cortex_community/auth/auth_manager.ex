@@ -19,6 +19,11 @@ defmodule CortexCommunity.Auth.AuthManager do
 
   alias CortexCommunity.Auth.ThalamusClient
 
+  require Logger
+
+  # ETS table for deprecation warning throttling (1 warning per minute)
+  @deprecation_table :thalamus_deprecation_throttle
+
   @doc """
   Authenticates a token based on the configured auth mode.
 
@@ -47,8 +52,7 @@ defmodule CortexCommunity.Auth.AuthManager do
   # ---------------------------------------------------------------------------
 
   def authenticate("ctx_" <> _ = token, :hybrid) do
-    require Logger
-    Logger.warning("Using deprecated ctx_ API key. Migrate to Thalamus OAuth2 tokens.")
+    throttle_deprecation_warning()
 
     authenticate(token, :local)
   end
@@ -92,5 +96,27 @@ defmodule CortexCommunity.Auth.AuthManager do
 
   defp users_module do
     Application.get_env(:cortex_community, :users_module, CortexCommunity.Users)
+  end
+
+  # Throttle deprecation warnings to at most 1 per minute
+  defp throttle_deprecation_warning do
+    ensure_throttle_table!()
+    now = System.monotonic_time(:second)
+
+    case :ets.lookup(@deprecation_table, :last_warning) do
+      [{:last_warning, timestamp}] when now - timestamp < 60 ->
+        :ok
+
+      _ ->
+        :ets.insert(@deprecation_table, {:last_warning, now})
+        Logger.warning("Using deprecated ctx_ API key. Migrate to Thalamus OAuth2 tokens.")
+    end
+  end
+
+  defp ensure_throttle_table! do
+    :ets.new(@deprecation_table, [:named_table, :set, :public])
+    :ok
+  rescue
+    ArgumentError -> :ok
   end
 end

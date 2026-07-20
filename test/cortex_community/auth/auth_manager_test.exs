@@ -11,7 +11,7 @@ defmodule CortexCommunity.Auth.AuthManagerTest do
   # Helper to stub local auth
   # ---------------------------------------------------------------------------
 
-  defp stub_local_auth(return) do
+  defp stub_local_auth do
     stub(CortexCommunity.Users.Mock, :authenticate_by_api_key, fn
       "ctx_valid-key" -> {:ok, user_fixture()}
       "ctx_expired-key" -> {:error, :expired_api_key}
@@ -34,7 +34,7 @@ defmodule CortexCommunity.Auth.AuthManagerTest do
 
   describe "authenticate/2 in :local mode" do
     test "returns user for valid ctx_ key" do
-      stub_local_auth(nil)
+      stub_local_auth()
 
       assert {:ok, auth_info} = AuthManager.authenticate("ctx_valid-key", :local)
       assert auth_info.source == :local
@@ -43,13 +43,13 @@ defmodule CortexCommunity.Auth.AuthManagerTest do
     end
 
     test "returns error for invalid ctx_ key" do
-      stub_local_auth(nil)
+      stub_local_auth()
 
       assert {:error, :invalid_api_key} = AuthManager.authenticate("bad-key", :local)
     end
 
     test "returns error for expired ctx_ key" do
-      stub_local_auth(nil)
+      stub_local_auth()
 
       assert {:error, :expired_api_key} = AuthManager.authenticate("ctx_expired-key", :local)
     end
@@ -79,7 +79,7 @@ defmodule CortexCommunity.Auth.AuthManagerTest do
 
   describe "authenticate/2 in :hybrid mode" do
     test "routes ctx_ keys to local auth" do
-      stub_local_auth(nil)
+      stub_local_auth()
 
       assert {:ok, auth_info} = AuthManager.authenticate("ctx_valid-key", :hybrid)
       assert auth_info.source == :local
@@ -98,7 +98,7 @@ defmodule CortexCommunity.Auth.AuthManagerTest do
   describe "authenticate/1 (default mode from config)" do
     test "uses mode from Application config" do
       # In test environment, AUTH_MODE=local from test.exs
-      stub_local_auth(nil)
+      stub_local_auth()
 
       assert {:ok, auth_info} = AuthManager.authenticate("ctx_valid-key", :local)
       assert auth_info.source == :local
