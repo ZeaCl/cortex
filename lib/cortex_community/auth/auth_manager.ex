@@ -86,13 +86,18 @@ defmodule CortexCommunity.Auth.AuthManager do
   end
 
   # ---------------------------------------------------------------------------
-  # Private — configuration
+  # Public — configuration (used by plug)
   # ---------------------------------------------------------------------------
 
-  defp get_mode do
+  @doc false
+  def get_mode do
     auth_config = Application.get_env(:cortex_community, :auth, [])
     Keyword.get(auth_config, :mode, :hybrid)
   end
+
+  # ---------------------------------------------------------------------------
+  # Private
+  # ---------------------------------------------------------------------------
 
   defp users_module do
     Application.get_env(:cortex_community, :users_module, CortexCommunity.Users)

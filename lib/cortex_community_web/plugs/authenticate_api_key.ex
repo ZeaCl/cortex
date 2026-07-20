@@ -110,7 +110,6 @@ defmodule CortexCommunityWeb.Plugs.AuthenticateApiKey do
   # ---------------------------------------------------------------------------
 
   defp get_auth_mode do
-    auth_config = Application.get_env(:cortex_community, :auth, [])
-    Keyword.get(auth_config, :mode, :hybrid)
+    AuthManager.get_mode()
   end
 end
