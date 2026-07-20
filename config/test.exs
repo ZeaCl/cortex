@@ -11,6 +11,12 @@ config :cortex_community, CortexCommunityWeb.Endpoint,
 config :cortex_community, :cortex_core, CortexCore.Mock
 config :cortex_community, :users_module, CortexCommunity.Users.Mock
 
+# Force local auth mode in tests (no Thalamus dependency)
+# Set as system env var so runtime.exs picks it up (runs after compile-time config)
+System.put_env("AUTH_MODE", "local")
+
+config :cortex_community, :auth, mode: :local
+
 # Print only warnings and errors during test
 config :logger, level: :warning
 

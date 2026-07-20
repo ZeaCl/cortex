@@ -2,7 +2,46 @@
 
 ## Overview
 
-Cortex uses a **self-contained authentication system** inspired by OpenClaw. Client applications (like Allisbox) authenticate using **Cortex API keys**, and Cortex manages user credentials internally without exposing them to clients.
+Cortex supports **two authentication methods**:
+
+| Method | Status | Description |
+|--------|--------|-------------|
+| **Thalamus OAuth2 (JWT)** | ✅ Recommended | Machine-to-machine tokens issued by Thalamus |
+| **ctx_ API keys** | ⚠️ Deprecated | Local API keys stored in Cortex DB |
+
+> ⚠️ `ctx_` API keys are deprecated and will be removed in a future version.
+> Migrate to Thalamus OAuth2 as soon as possible.
+
+## Quick Reference
+
+### Thalamus OAuth2 (Recommended)
+
+```bash
+# Get a token from Thalamus
+curl -X POST https://auth.zea.cl/oauth/token \
+  -H "Authorization: Basic base64(CLIENT_ID:CLIENT_SECRET)" \
+  -d "grant_type=client_credentials" \
+  -d "scope=cortex:chat"
+
+# Use it with Cortex
+curl -X POST http://localhost:4000/api/chat \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"messages": [{"role": "user", "content": "Hello!"}]}'
+```
+
+### ctx_ API Key (Legacy)
+
+```bash
+# Generate a key
+mix cortex.keygen my-project
+
+# Use it
+curl -X POST http://localhost:4000/api/chat \
+  -H "Authorization: Bearer ctx_abc123..." \
+  -H "Content-Type: application/json" \
+  -d '{"messages": [{"role": "user", "content": "Hello!"}]}'
+```
 
 ## Architecture
 
@@ -345,7 +384,116 @@ curl -X POST http://localhost:4000/api/chat \
 4. ✅ **Authentication middleware** - Complete
 5. ✅ **ChatController integration** - Complete
 6. ✅ **Setup wizard API key generation** - Complete
-7. 🚧 **OAuth implementation** for claude.ai (coming soon)
-8. 🚧 **Credential encryption** (security improvement)
-9. 🚧 **API key management endpoints** (list, revoke, create)
-10. 🚧 **Allisbox integration** (configure to use Cortex API key)
+7. ✅ **Thalamus OAuth2 integration** — `ThalamusClient`, `AuthManager`, 3-mode plug
+8. 🚧 **OAuth implementation** for claude.ai (coming soon)
+9. 🚧 **Credential encryption** (security improvement)
+10. 🚧 **API key management endpoints** (list, revoke, create)
+11. 🚧 **Allisbox integration** (configure to use Cortex API key)
+
+## Thalamus OAuth2 Authentication (NEW)
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Client (Thalamus M2M)                         │
+│                                                                   │
+│  - Registers as OAuth2 client in Thalamus                       │
+│  - Gets access token via client_credentials grant                │
+│  - Sends: Authorization: Bearer <JWT>                           │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      Cortex (Resource Server)                    │
+│                                                                   │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  1. AuthenticateApiKey Plug (refactored)                  │  │
+│  │     - Detects token type (ctx_ vs JWT)                    │  │
+│  │     - Delegates to AuthManager.authenticate/2             │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                │                                  │
+│                                ▼                                  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  2. AuthManager                                           │  │
+│  │     - Local mode → Users.authenticate_by_api_key/1        │  │
+│  │     - Thalamus mode → ThalamusClient.introspect/1 (JWT)   │  │
+│  │     - Hybrid mode → both, with deprecation warnings       │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                │                                  │
+│                    ┌───────────┴───────────┐                     │
+│                    ▼                       ▼                      │
+│  ┌─────────────────────────┐ ┌─────────────────────────┐        │
+│  │ ThalamusClient          │ │ Users (local)           │        │
+│  │ POST /oauth/introspect  │ │ DB lookup + cache       │        │
+│  │ ETS cache (60s TTL)     │ │                         │        │
+│  └─────────────────────────┘ └─────────────────────────┘        │
+│                                                                   │
+│  Assigns to conn:                                                │
+│    - cortex_user   → CortexUser.t() | nil (JWT)                  │
+│    - auth_source   → :local | :thalamus                          │
+│    - auth_claims   → %{scopes, domain_roles, client_id, ...}     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Auth Modes
+
+| `AUTH_MODE` | ctx_ keys | JWT (Thalamus) | Use case |
+|-------------|-----------|----------------|----------|
+| `local` | ✅ | ❌ | Development |
+| `hybrid` | ✅ (with warning) | ✅ | Migration (default) |
+| `thalamus` | ❌ | ✅ | Production |
+
+### JWT Claims
+
+On successful introspection, Thalamus returns claims like:
+
+```json
+{
+  "active": true,
+  "client_id": "cortex-gateway",
+  "scopes": ["cortex:chat", "cortex:models:read"],
+  "domain_roles": [
+    {
+      "org_id": "ea7b11ea-...",
+      "domain": "funds",
+      "role": "gp_admin",
+      "scopes": ["funds:read", "funds:write"]
+    }
+  ]
+}
+```
+
+> ⚠️ For authorization decisions, use `domain_roles` — it is the canonical
+> source for multi-tenant permissions.
+
+### Migration Guide
+
+1. **Register Cortex as an OAuth2 client in Thalamus**
+   - Contact your Thalamus admin or use the admin API
+   - Grant types: `client_credentials`
+   - Scopes: `cortex:chat`, `cortex:models:read`, `cortex:health:read`
+
+2. **Configure environment variables:**
+   ```bash
+   AUTH_MODE=hybrid
+   THALAMUS_INTROSPECT_URL=https://auth.zea.cl/oauth/introspect
+   THALAMUS_CLIENT_ID=cortex-gateway
+   THALAMUS_CLIENT_SECRET=<your-secret>
+   ```
+
+3. **Update your client to use Thalamus tokens:**
+   ```bash
+   # Old (legacy)
+   Authorization: Bearer ctx_abc123...
+
+   # New (Thalamus)
+   Authorization: Bearer eyJhbGciOiJSUzI1NiIs...
+   ```
+
+4. **Monitor logs for deprecation warnings:**
+   ```
+   [WARNING] Using deprecated ctx_ API key. Migrate to Thalamus OAuth2 tokens.
+   ```
+
+5. **Once all consumers are on Thalamus**, switch to `AUTH_MODE=thalamus`.

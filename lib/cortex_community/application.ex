@@ -16,6 +16,9 @@ defmodule CortexCommunity.Application do
     # Configure Cortex Core from environment
     _cortex_config = configure_cortex()
 
+    # Validate Thalamus auth configuration at startup
+    validate_auth_config!()
+
     children = [
       # Start the Ecto repository
       CortexCommunity.Repo,
@@ -232,6 +235,33 @@ defmodule CortexCommunity.Application do
       end
 
     [strategy: strategy]
+  end
+
+  defp validate_auth_config! do
+    auth_config = Application.get_env(:cortex_community, :auth, [])
+    mode = Keyword.get(auth_config, :mode, :hybrid)
+
+    case mode do
+      :thalamus ->
+        client_id = Keyword.get(auth_config, :thalamus_client_id)
+        client_secret = Keyword.get(auth_config, :thalamus_client_secret)
+
+        unless client_id && client_secret do
+          Logger.error(
+            "AUTH_MODE=thalamus requires THALAMUS_CLIENT_ID and THALAMUS_CLIENT_SECRET"
+          )
+
+          raise "Missing Thalamus credentials"
+        end
+
+        Logger.info("🔐 Auth mode: thalamus — JWT validation via #{Keyword.get(auth_config, :thalamus_introspect_url)}")
+
+      :hybrid ->
+        Logger.info("🔐 Auth mode: hybrid (local API keys + Thalamus JWT)")
+
+      :local ->
+        Logger.info("🔐 Auth mode: local only (ctx_ API keys)")
+    end
   end
 
   defp print_banner do

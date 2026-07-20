@@ -62,8 +62,19 @@ defmodule CortexCommunityWeb.HealthController do
     health = @cortex_core.health_status()
     workers = @cortex_core.list_workers()
     stats = CortexCommunity.StatsCollector.get_stats()
-    provider_models = Repo.all(ProviderModel)
-    rankings = CortexCommunity.ModelSelector.get_rankings()
+    provider_models =
+      try do
+        Repo.all(ProviderModel)
+      rescue
+        _ -> []
+      end
+
+    rankings =
+      try do
+        CortexCommunity.ModelSelector.get_rankings()
+      rescue
+        _ -> %{}
+      end
 
     pm_by_name = Map.new(provider_models, &{&1.worker_name, &1})
 
