@@ -30,23 +30,30 @@ defmodule CortexCommunityWeb.ModelsControllerTest do
   }
 
   # ---------------------------------------------------------------------------
-  # Authentication — no mock setup needed
+  # Public access — /api/models is a public endpoint (no auth required)
   # ---------------------------------------------------------------------------
 
-  describe "GET /api/models — authentication" do
-    test "returns 401 when Authorization header is missing", %{conn: conn} do
-      conn = get(conn, ~p"/api/models")
-      assert json = json_response(conn, 401)
-      assert json["error"] == "unauthorized"
+  describe "GET /api/models — public access" do
+    setup do
+      stub(CortexCore.Mock, :list_workers, fn -> @workers_fixture end)
+      stub(CortexCore.Mock, :health_status, fn -> @health_fixture end)
+      :ok
     end
 
-    test "returns 401 with unrecognized authorization scheme", %{conn: conn} do
+    test "returns 200 without Authorization header", %{conn: conn} do
+      conn = get(conn, ~p"/api/models")
+      assert json = json_response(conn, 200)
+      assert is_list(json["llm"])
+      assert is_list(json["search"])
+    end
+
+    test "returns 200 with any authorization scheme (ignored)", %{conn: conn} do
       conn =
         conn
         |> put_req_header("authorization", "Token some-random-key")
         |> get(~p"/api/models")
 
-      assert json_response(conn, 401)
+      assert json_response(conn, 200)
     end
   end
 

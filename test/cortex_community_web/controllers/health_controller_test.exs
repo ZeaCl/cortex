@@ -88,18 +88,20 @@ defmodule CortexCommunityWeb.HealthControllerTest do
     test "returns health and stats without authentication", %{conn: conn} do
       conn = get(conn, ~p"/api/health/detailed")
       assert json = json_response(conn, 200)
-      assert Map.has_key?(json, "health")
-      assert Map.has_key?(json, "stats")
-      assert Map.has_key?(json, "system")
+      assert Map.has_key?(json, "status")
+      assert Map.has_key?(json, "gateway")
+      assert Map.has_key?(json, "llm")
+      assert Map.has_key?(json, "search")
+      assert Map.has_key?(json, "recommendations")
     end
 
-    test "system section includes version and memory info", %{conn: conn} do
+    test "gateway section includes version and memory info", %{conn: conn} do
       conn = get(conn, ~p"/api/health/detailed")
       assert json = json_response(conn, 200)
-      system = json["system"]
-      assert Map.has_key?(system, "version")
-      assert Map.has_key?(system, "memory_mb")
-      assert Map.has_key?(system, "uptime_seconds")
+      gateway = json["gateway"]
+      assert Map.has_key?(gateway, "version")
+      assert Map.has_key?(gateway, "memory_mb")
+      assert Map.has_key?(gateway, "uptime")
     end
   end
 

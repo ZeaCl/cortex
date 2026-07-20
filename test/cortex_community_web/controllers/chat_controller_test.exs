@@ -116,7 +116,7 @@ defmodule CortexCommunityWeb.ChatControllerTest do
       assert body =~ ~s("content":"Hello")
       assert body =~ ~s("content":"world")
       assert body =~ "event: done"
-      assert body =~ ~s("done": true)
+      assert body =~ ~s("done":true)
     end
 
     test "returns 503 when no workers available", %{conn: conn} do
