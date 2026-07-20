@@ -1,5 +1,5 @@
-_build/
-deps/
+# .dockerignore — only used for Dockerfile.runtime
+# The build happens in CI, not in Docker
 .git/
 .elixir_ls/
 node_modules/
@@ -11,10 +11,11 @@ cover/
 test/
 test-results/
 doc/
-core/_build/
-core/deps/
-core/doc/
+core/.git/
 core/erl_crash.dump
 core/*.tar
 core/coveralls.json
 core/test/
+core/doc/
+core/examples/
+core/guides/
