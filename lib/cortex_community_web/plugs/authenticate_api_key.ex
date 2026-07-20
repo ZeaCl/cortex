@@ -1,20 +1,28 @@
 defmodule CortexCommunityWeb.Plugs.AuthenticateApiKey do
   @moduledoc """
-  Plug for authenticating requests using Cortex API keys.
+  Plug for authenticating requests using Cortex API keys or Thalamus JWT tokens.
 
-  Expects an `Authorization` header in the format:
-  - `Bearer ctx_...` (preferred)
-  - `ctx_...` (also accepted)
+  The authentication mode is controlled by the `AUTH_MODE` environment variable:
 
-  On successful authentication:
-  - Assigns the authenticated user to `conn.assigns.cortex_user`
+    * `local` — only `ctx_` API keys (current behavior, dev)
+    * `thalamus` — only JWT tokens validated via Thalamus `/oauth/introspect`
+    * `hybrid` — both (default)
 
-  On authentication failure:
-  - Returns 401 Unauthorized
+  Expects an `Authorization` header:
+
+    * `Bearer ctx_...` — local API key
+    * `Bearer ctx_...` (without Bearer prefix) — also accepted
+    * `Bearer <JWT>` — Thalamus access token (thalamus/hybrid modes)
+
+  On successful authentication, assigns to conn:
+
+    * `conn.assigns.cortex_user` — `CortexUser.t()` or `nil` (thalamus)
+    * `conn.assigns.auth_source` — `:local` | `:thalamus`
+    * `conn.assigns.auth_claims` — JWT claims map or `nil` (local)
+
+  On authentication failure, returns 401 Unauthorized.
 
   ## Usage
-
-  Add to router or controller:
 
       plug CortexCommunityWeb.Plugs.AuthenticateApiKey
   """
@@ -22,49 +30,37 @@ defmodule CortexCommunityWeb.Plugs.AuthenticateApiKey do
   import Plug.Conn
   require Logger
 
+  alias CortexCommunity.Auth.AuthManager
   @users Application.compile_env(:cortex_community, :users_module, CortexCommunity.Users)
 
   def init(opts), do: opts
 
   def call(conn, _opts) do
-    with {:ok, api_key} <- extract_api_key(conn),
-         {:ok, user} <- @users.authenticate_by_api_key(api_key) do
-      # Authentication successful
-      conn
-      |> assign(:cortex_user, user)
-      |> assign(:authenticated_via, :api_key)
-    else
-      {:error, :missing_authorization} ->
-        conn
-        |> put_resp_content_type("application/json")
-        |> send_resp(
-          401,
-          Jason.encode!(%{
-            error: "unauthorized",
-            message: "Missing Authorization header. Use: Bearer ctx_..."
-          })
-        )
-        |> halt()
+    auth_mode = get_auth_mode()
+
+    case extract_token(conn) do
+      {:ok, token} ->
+        case AuthManager.authenticate(token, auth_mode) do
+          {:ok, auth_info} ->
+            conn
+            |> assign(:cortex_user, auth_info.user)
+            |> assign(:auth_source, auth_info.source)
+            |> assign(:auth_claims, auth_info.claims)
+
+          {:error, reason} ->
+            handle_error(conn, reason)
+        end
 
       {:error, reason} ->
-        # Invalid or expired API key
-        Logger.warning("API key authentication failed: #{inspect(reason)}")
-
-        conn
-        |> put_resp_content_type("application/json")
-        |> send_resp(
-          401,
-          Jason.encode!(%{
-            error: "unauthorized",
-            message: format_error_message(reason)
-          })
-        )
-        |> halt()
+        handle_error(conn, reason)
     end
   end
 
-  # Extract API key from Authorization header
-  defp extract_api_key(conn) do
+  # ---------------------------------------------------------------------------
+  # Token extraction
+  # ---------------------------------------------------------------------------
+
+  defp extract_token(conn) do
     case get_req_header(conn, "authorization") do
       [] ->
         {:error, :missing_authorization}
@@ -74,15 +70,48 @@ defmodule CortexCommunityWeb.Plugs.AuthenticateApiKey do
     end
   end
 
-  # Parse different Authorization header formats
-  defp parse_auth_header("Bearer " <> api_key), do: {:ok, String.trim(api_key)}
-  defp parse_auth_header("bearer " <> api_key), do: {:ok, String.trim(api_key)}
-  defp parse_auth_header("ctx_" <> _ = api_key), do: {:ok, String.trim(api_key)}
+  defp parse_auth_header("Bearer " <> token), do: {:ok, String.trim(token)}
+  defp parse_auth_header("bearer " <> token), do: {:ok, String.trim(token)}
+  defp parse_auth_header("ctx_" <> _ = token), do: {:ok, String.trim(token)}
   defp parse_auth_header(_), do: {:error, :invalid_authorization_format}
+
+  # ---------------------------------------------------------------------------
+  # Error handling
+  # ---------------------------------------------------------------------------
+
+  defp handle_error(conn, reason) do
+    Logger.warning("Authentication failed: #{inspect(reason)}")
+
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(401, Jason.encode!(%{
+      error: "unauthorized",
+      message: format_error_message(reason)
+    }))
+    |> halt()
+  end
+
+  defp format_error_message(:missing_authorization),
+    do: "Missing Authorization header. Use: Bearer ctx_... or Bearer <JWT>"
+
+  defp format_error_message(:invalid_authorization_format),
+    do: "Invalid authorization header format. Use: Bearer ctx_... or Bearer <JWT>"
 
   defp format_error_message(:invalid_api_key), do: "Invalid API key"
   defp format_error_message(:expired_api_key), do: "API key has expired"
+  defp format_error_message(:inactive_token), do: "Token is not active"
+  defp format_error_message(:invalid_credentials), do: "Invalid client credentials"
+  defp format_error_message(:timeout), do: "Authentication service timeout"
+  defp format_error_message(:local_keys_not_allowed_in_thalamus_mode),
+    do: "Local API keys are not allowed in thalamus auth mode"
+  defp format_error_message(_), do: "Authentication failed"
 
-  defp format_error_message(:invalid_authorization_format),
-    do: "Invalid authorization header format"
+  # ---------------------------------------------------------------------------
+  # Configuration
+  # ---------------------------------------------------------------------------
+
+  defp get_auth_mode do
+    auth_config = Application.get_env(:cortex_community, :auth, [])
+    Keyword.get(auth_config, :mode, :hybrid)
+  end
 end

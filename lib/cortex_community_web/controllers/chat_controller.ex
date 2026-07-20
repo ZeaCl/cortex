@@ -9,7 +9,8 @@ defmodule CortexCommunityWeb.ChatController do
   alias CortexCommunity.Credentials
   alias CortexCommunity.StatsCollector
 
-  # Authenticate API key and assign user to conn.assigns.cortex_user
+  # Authenticate request via AuthManager (local API key or Thalamus JWT)
+  # Assigns cortex_user, auth_source, auth_claims to conn.assigns
   plug CortexCommunityWeb.Plugs.AuthenticateApiKey
 
   @doc """
@@ -24,10 +25,13 @@ defmodule CortexCommunityWeb.ChatController do
 
     # Extract authenticated user from middleware (if present)
     cortex_user = Map.get(conn.assigns, :cortex_user)
+    auth_source = Map.get(conn.assigns, :auth_source, :local)
+    auth_claims = Map.get(conn.assigns, :auth_claims, %{})
+    client_id = auth_claims["client_id"] || "n/a"
 
     # Log request
     Logger.info(
-      "Chat request: user=#{inspect(cortex_user && cortex_user.username)}, messages=#{length(messages)}"
+      "Chat request: user=#{inspect(cortex_user && cortex_user.username)}, source=#{auth_source}, client_id=#{client_id}, messages=#{length(messages)}"
     )
 
     conn

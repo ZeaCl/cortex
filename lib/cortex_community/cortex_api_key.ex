@@ -2,6 +2,10 @@ defmodule CortexCommunity.CortexApiKey do
   @moduledoc """
   Schema for Cortex API keys.
 
+  > ⚠️ **Deprecated** — Use Thalamus OAuth2 tokens instead.
+  > See `CortexCommunity.Auth.AuthManager` for the new authentication flow.
+  > `ctx_` keys will be removed in a future version once all consumers migrate.
+
   API keys are used to authenticate requests from client applications (like Allisbox).
   Format: "ctx_" + base62 encoded random bytes (e.g., "ctx_4Kj9mN2pQ...")
   """

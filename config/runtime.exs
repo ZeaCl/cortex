@@ -37,6 +37,25 @@ end
 config :cortex_core,
   worker_pool_strategy: String.to_atom(System.get_env("WORKER_POOL_STRATEGY", "local_first"))
 
+# ---------------------------------------------------------------------------
+# Auth: Thalamus OAuth2 Integration
+# ---------------------------------------------------------------------------
+
+auth_mode =
+  case System.get_env("AUTH_MODE", "hybrid") do
+    "local" -> :local
+    "thalamus" -> :thalamus
+    _ -> :hybrid
+  end
+
+config :cortex_community, :auth,
+  mode: auth_mode,
+  thalamus_introspect_url:
+    System.get_env("THALAMUS_INTROSPECT_URL", "https://auth.zea.cl/oauth/introspect"),
+  thalamus_client_id: System.get_env("THALAMUS_CLIENT_ID"),
+  thalamus_client_secret: System.get_env("THALAMUS_CLIENT_SECRET"),
+  thalamus_cache_ttl: String.to_integer(System.get_env("THALAMUS_CACHE_TTL", "60"))
+
 if config_env() == :prod do
   # The secret key base is used to sign/encrypt cookies and other secrets.
   # A default value is used in config/dev.exs and config/test.exs but you
