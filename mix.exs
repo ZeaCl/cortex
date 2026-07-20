@@ -104,6 +104,7 @@ defmodule CortexCommunity.MixProject do
       cortex_community: [
         include_executables_for: [:unix],
         applications: [runtime_tools: :permanent],
+        validate_compile_env: false,
         steps: [:assemble, :tar],
         path: "releases",
         cookie: Base.encode64(:crypto.strong_rand_bytes(32))
