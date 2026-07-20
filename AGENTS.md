@@ -1,5 +1,54 @@
 This is a web application written using the Phoenix web framework.
 
+## 🧠 Wiki interna (.wiki/)
+
+Este proyecto mantiene una **memoria persistente** en `.wiki/` — NO es documentación para consumidores (eso está en `docs/`). Es el cerebro compartido del equipo y del agente.
+
+### Cuándo LEER la wiki
+
+**Siempre antes de empezar cualquier tarea.** El agente debe leer `.wiki/index.md` primero para entender el contexto del proyecto, y luego los archivos relevantes a la tarea.
+
+```
+1. .wiki/index.md          ← Catálogo de todo lo que existe
+2. .wiki/rules.md          ← Reglas, convenciones, credenciales, anti-patrones
+3. .wiki/features/<tema>.md  ← Si la tarea toca un feature existente
+4. .wiki/integrations/<sistema>.md ← Si la tarea involucra un sistema externo
+```
+
+### Cuándo ESCRIBIR en la wiki
+
+**Siempre después de completar una tarea significativa.** El agente debe registrar:
+
+| Qué | Dónde | Cuándo |
+|------|-------|--------|
+| Nueva feature completada | `.wiki/features/<nombre>.md` | Al terminar la feature |
+| Integración con sistema externo | `.wiki/integrations/<sistema>.md` | Al configurar/integrar |
+| Regla, patrón o anti-patrón descubierto | `.wiki/rules.md` | Al descubrirlo |
+| Entrada cronológica de lo hecho | `.wiki/log.md` | Al final de CADA sesión |
+| Nuevo archivo en la wiki | `.wiki/index.md` | Al crear el archivo |
+
+### Formato de log.md
+
+Cada entrada debe seguir el formato:
+
+```markdown
+## [YYYY-MM-DD] tipo | Título descriptivo
+**Descripción**: qué se hizo, qué se descubrió, qué decisiones se tomaron.
+**Archivos**: lista de archivos modificados.
+**Issues**: #num1, #num2.
+```
+
+Tipos: `feat`, `fix`, `docs`, `review`, `discover`, `test`, `infra`, `issue`.
+
+### Formato de features/*.md
+
+Cada feature debe documentar:
+- Qué se construyó (una frase)
+- Archivos creados/modificados (tabla)
+- Decisiones de diseño (por qué se eligió X sobre Y)
+- Lo que aprendimos (bugs, sorpresas, tradeoffs)
+- Issues relacionados
+
 ## Project guidelines
 
 - Use `mix precommit` alias when you are done with all changes and fix any pending issues
