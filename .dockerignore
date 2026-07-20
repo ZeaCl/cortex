@@ -1,0 +1,13 @@
+_build/
+deps/
+.git/
+.elixir_ls/
+node_modules/
+erl_crash.dump
+*.db
+*.db-journal
+.DS_Store
+cover/
+test/
+test-results/
+doc/
