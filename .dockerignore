@@ -11,3 +11,10 @@ cover/
 test/
 test-results/
 doc/
+core/_build/
+core/deps/
+core/doc/
+core/erl_crash.dump
+core/*.tar
+core/coveralls.json
+core/test/
