@@ -1,6 +1,6 @@
 # Dockerfile.runtime — Minimal runtime image for Cortex
 # The Elixir release is pre-built by the CI pipeline (publish.yml)
-FROM debian:bookworm-slim
+FROM ubuntu:24.04
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libstdc++6 openssl libncurses6 ca-certificates curl \
@@ -10,8 +10,8 @@ WORKDIR /app
 
 COPY _build/prod/rel/cortex_community/ /app/
 
-RUN addgroup --gid 1000 cortex && \
-    adduser --disabled-password --uid 1000 --gid 1000 cortex && \
+RUN groupadd --gid 1000 cortex && \
+    useradd --no-create-home --uid 1000 --gid 1000 cortex && \
     chown -R cortex:cortex /app
 
 USER cortex
