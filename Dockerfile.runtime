@@ -10,11 +10,10 @@ WORKDIR /app
 
 COPY _build/prod/rel/cortex_community/ /app/
 
-RUN groupadd --gid 1000 cortex && \
-    useradd --no-create-home --uid 1000 --gid 1000 cortex && \
+RUN useradd --no-create-home --uid 999 cortex && \
     chown -R cortex:cortex /app
 
-USER cortex
+USER 999
 
 EXPOSE 4000
 
