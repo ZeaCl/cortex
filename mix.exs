@@ -106,7 +106,6 @@ defmodule CortexCommunity.MixProject do
         applications: [runtime_tools: :permanent],
         validate_compile_env: false,
         steps: [:assemble, :tar],
-        path: "releases",
         cookie: Base.encode64(:crypto.strong_rand_bytes(32))
       ]
     ]
