@@ -1,18 +1,20 @@
 {
-  "name": "@zea-cl/cli-cortex",
+  "name": "@zea.cl/cortex",
   "version": "1.0.0",
-  "description": "Delegated CLI plugin for Cortex Web/Core",
+  "description": "ZEA Cortex CLI — Multi-Provider AI Gateway",
   "type": "module",
   "main": "src/index.js",
   "bin": {
-    "zea-gateway": "./src/index.js"
+    "zea-cortex": "./bin/zea-cortex.js"
   },
   "scripts": {
-    "start": "node src/index.js"
+    "start": "node bin/zea-cortex.js"
   },
   "dependencies": {
     "chalk": "^5.6.2",
-    "commander": "^12.0.0",
-    "ora": "^9.4.0"
-  }
+    "commander": "^12.0.0"
+  },
+  "repository": "github:ZeaCl/cortex",
+  "keywords": ["zea", "cortex", "ai", "llm", "gateway", "cli"],
+  "license": "Apache-2.0"
 }
