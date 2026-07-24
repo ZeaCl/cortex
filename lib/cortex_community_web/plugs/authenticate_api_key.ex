@@ -83,10 +83,13 @@ defmodule CortexCommunityWeb.Plugs.AuthenticateApiKey do
 
     conn
     |> put_resp_content_type("application/json")
-    |> send_resp(401, Jason.encode!(%{
-      error: "unauthorized",
-      message: format_error_message(reason)
-    }))
+    |> send_resp(
+      401,
+      Jason.encode!(%{
+        error: "unauthorized",
+        message: format_error_message(reason)
+      })
+    )
     |> halt()
   end
 
@@ -101,8 +104,10 @@ defmodule CortexCommunityWeb.Plugs.AuthenticateApiKey do
   defp format_error_message(:inactive_token), do: "Token is not active"
   defp format_error_message(:invalid_credentials), do: "Invalid client credentials"
   defp format_error_message(:timeout), do: "Authentication service timeout"
+
   defp format_error_message(:local_keys_not_allowed_in_thalamus_mode),
     do: "Local API keys are not allowed in thalamus auth mode"
+
   defp format_error_message(_), do: "Authentication failed"
 
   # ---------------------------------------------------------------------------

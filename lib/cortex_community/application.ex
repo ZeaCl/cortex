@@ -104,6 +104,7 @@ defmodule CortexCommunity.Application do
   @worker_capabilities %{
     "anthropic-primary" => [:chat, :tools, :reasoning],
     "anthropic-oauth-local" => [:chat, :tools, :reasoning],
+    "deepseek-primary" => [:chat, :tools, :reasoning],
     "gemini-primary" => [:chat, :tools, :long_context, :vision],
     "gemini-pro-25-primary" => [:chat, :tools, :long_context, :vision],
     "groq-primary" => [:chat, :tools, :fast],
@@ -254,7 +255,9 @@ defmodule CortexCommunity.Application do
           raise "Missing Thalamus credentials"
         end
 
-        Logger.info("🔐 Auth mode: thalamus — JWT validation via #{Keyword.get(auth_config, :thalamus_introspect_url)}")
+        Logger.info(
+          "🔐 Auth mode: thalamus — JWT validation via #{Keyword.get(auth_config, :thalamus_introspect_url)}"
+        )
 
       :hybrid ->
         Logger.info("🔐 Auth mode: hybrid (local API keys + Thalamus JWT)")
