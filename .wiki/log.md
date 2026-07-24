@@ -1,5 +1,20 @@
 # Log
 
+## [2025-07-24] feat | mix cortex.setup.thalamus
+**Descripción**: Creada la mix task `cortex.setup.thalamus` que registra Cortex como OAuth2 client en Thalamus, guarda `THALAMUS_CLIENT_ID`/`THALAMUS_CLIENT_SECRET` en `.env`, y soporta flags `--url` y `--org`.
+**Archivos**: lib/mix/tasks/cortex.setup.thalamus.ex
+**Issues**: #14
+
+## [2025-07-24] feat | CLI zea-cortex + doctor
+**Descripción**: Creada la CLI `zea-cortex` siguiendo el patrón de Cerebelum/Thalamus. Incluye `health`, `doctor` (diagnostica connectivity, Thalamus auth, LLM providers, API keys) y `config set-env local|prod`. Soporta `--zea-discover` y `--zea-manifest`.
+**Archivos**: cli/ (9 archivos nuevos)
+**Issues**: #13, #16
+
+## [2025-07-24] feat | DeepSeek provider + Thalamus secrets
+**Descripción**: Agregado DeepSeekWorker en cortex_core, ThalamusClient.resolve_secret/3, e integración en chat controller para resolver API keys desde Thalamus secrets cuando el usuario está autenticado vía JWT. Esto permite que `zea thalamus secret create --provider deepseek --value sk-...` funcione sin cambios en cortex.
+**Archivos**: core/lib/cortex_core/workers/adapters/deepseek_worker.ex, core/lib/cortex_core/workers/supervisor.ex, lib/cortex_community/user_credential.ex, lib/cortex_community/application.ex, lib/cortex_community/auth/thalamus_client.ex, lib/cortex_community_web/controllers/chat_controller.ex
+**Issues**: #15, #17
+
 ## [2026-07-20] fix | Reparados 5 tests preexistentes
 **Diagnóstico**: 3 fallas distintas — ModelsController esperaba 401 pero `/api/models` es público (sin auth plug), HealthController crasheaba con `Repo.all` sin DB configurada, ChatController SSE regex buscaba `"done": true` con espacio pero el JSON real es `"done":true` compacto. **Fix**: stubs + assert 200 para models, `try/rescue` para DB en health controller, regex corregido. 105 tests, 0 failures.
 

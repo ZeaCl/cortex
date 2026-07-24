@@ -3,6 +3,8 @@
 ## Features
 
 - [thalamus-oauth2](features/thalamus-oauth2.md) — OAuth2 JWT auth, ThalamusClient, AuthManager, 3 modos
+- [deepseek-thalamus-secrets](features/deepseek-thalamus-secrets.md) — DeepSeekWorker + Thalamus secrets resolution
+- [zea-cortex-cli](features/zea-cortex-cli.md) — CLI zea-cortex con health, doctor, config
 
 ## Integraciones
 
