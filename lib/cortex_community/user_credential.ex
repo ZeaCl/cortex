@@ -52,7 +52,8 @@ defmodule CortexCommunity.UserCredential do
       "openai",
       "google",
       "groq",
-      "github_copilot"
+      "github_copilot",
+      "deepseek"
     ])
     |> validate_inclusion(:auth_type, ["oauth", "api_key", "token"])
     |> unique_constraint([:user_id, :provider])

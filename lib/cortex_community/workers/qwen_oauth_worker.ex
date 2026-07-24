@@ -66,10 +66,12 @@ defmodule CortexCommunity.Workers.QwenOAuthWorker do
            retry: false
          ) do
       {:ok, %{status: status}} when status in 200..299 -> {:ok, :available}
-      {:ok, %{status: 429}} -> {:ok, :available}  # Rate limit ≠ unavailable, still healthy
+      # Rate limit ≠ unavailable, still healthy
+      {:ok, %{status: 429}} -> {:ok, :available}
       {:ok, %{status: 401}} -> {:error, {:client_error, 401}}
       {:ok, %{status: status}} -> {:error, {:http_error, status}}
-      {:error, %Req.TransportError{reason: :timeout}} -> {:ok, :available}  # Timeout ≠ unavailable
+      # Timeout ≠ unavailable
+      {:error, %Req.TransportError{reason: :timeout}} -> {:ok, :available}
       {:error, _reason} -> {:error, :unavailable}
     end
   end
