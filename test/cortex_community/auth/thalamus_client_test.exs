@@ -82,7 +82,12 @@ defmodule CortexCommunity.Auth.ThalamusClientTest do
 
   describe "introspect/1 with active token" do
     test "returns claims when Thalamus responds with active: true" do
-      claims = %{"active" => true, "sub" => "user-42", "scope" => "read write", "client_id" => "cortex"}
+      claims = %{
+        "active" => true,
+        "sub" => "user-42",
+        "scope" => "read write",
+        "client_id" => "cortex"
+      }
 
       set_handler(fn conn ->
         {:ok, _body, conn} = Plug.Conn.read_body(conn)
