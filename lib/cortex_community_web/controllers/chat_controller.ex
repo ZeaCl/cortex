@@ -8,6 +8,7 @@ defmodule CortexCommunityWeb.ChatController do
   alias CortexCommunity.Clients.ClaudeOAuthClient
   alias CortexCommunity.Credentials
   alias CortexCommunity.StatsCollector
+  alias CortexCommunity.Auth.ThalamusClient
 
   # Authenticate request via AuthManager (local API key or Thalamus JWT)
   # Assigns cortex_user, auth_source, auth_claims to conn.assigns
@@ -40,7 +41,7 @@ defmodule CortexCommunityWeb.ChatController do
     |> put_resp_header("connection", "keep-alive")
     # For nginx
     |> put_resp_header("x-accel-buffering", "no")
-    |> dispatch_and_stream(messages, opts, cortex_user, start_time)
+    |> dispatch_and_stream(messages, opts, cortex_user, auth_claims, start_time)
   end
 
   def create(conn, %{"messages" => _}) do
@@ -53,15 +54,22 @@ defmodule CortexCommunityWeb.ChatController do
 
   # Private functions
 
-  defp dispatch_and_stream(conn, messages, opts, nil, start_time) do
+  defp dispatch_and_stream(conn, messages, opts, nil, _auth_claims, start_time) do
     # No authenticated user → use server API keys (original behavior)
     Logger.debug("No authenticated user - using server API keys")
     dispatch_with_server_credentials(conn, messages, opts, start_time)
   end
 
-  defp dispatch_and_stream(conn, messages, opts, %CortexCommunity.CortexUser{} = user, start_time) do
+  defp dispatch_and_stream(
+         conn,
+         messages,
+         opts,
+         %CortexCommunity.CortexUser{} = user,
+         auth_claims,
+         start_time
+       ) do
     # Authenticated user → try user credentials first, fallback to server if not available
-    case try_user_credentials(user, messages, opts) do
+    case try_user_credentials(user, messages, opts, auth_claims) do
       {:ok, stream} ->
         Logger.info("✓ Using user credentials for user=#{user.username}")
         StatsCollector.track_request(:started)
@@ -80,7 +88,12 @@ defmodule CortexCommunityWeb.ChatController do
   end
 
   # Try to use user's configured credentials
-  defp try_user_credentials(%CortexCommunity.CortexUser{id: user_id} = user, messages, opts) do
+  defp try_user_credentials(
+         %CortexCommunity.CortexUser{id: user_id} = user,
+         messages,
+         opts,
+         auth_claims
+       ) do
     case determine_provider(opts) do
       nil ->
         # Non-anthropic worker requested — use server pool (groq, gemini, etc.)
@@ -93,11 +106,38 @@ defmodule CortexCommunityWeb.ChatController do
             use_user_credentials(user_creds, messages, opts)
 
           {:error, :not_found} ->
-            {:fallback, "no credentials configured"}
+            # Try Thalamus secrets for this provider before falling back to server
+            try_thalamus_secret(user, provider, auth_claims, messages, opts)
 
           {:error, :expired} ->
-            {:fallback, "credentials expired"}
+            # Try Thalamus secrets as fallback for expired creds too
+            try_thalamus_secret(user, provider, auth_claims, messages, opts)
         end
+    end
+  end
+
+  # Try to resolve the API key from Thalamus secrets for the authenticated user
+  defp try_thalamus_secret(user, provider, auth_claims, messages, opts) do
+    org_id = auth_claims["organization_id"] || auth_claims[:organization_id]
+    user_sub = auth_claims["sub"] || auth_claims[:sub]
+
+    if org_id && user_sub do
+      case ThalamusClient.resolve_secret(provider, user_sub, org_id) do
+        {:ok, api_key} ->
+          Logger.info(
+            "✓ Resolved #{provider} API key from Thalamus secrets for user=#{user.username}"
+          )
+
+          # Use the resolved API key directly
+          creds = %{api_key: api_key, provider: provider}
+          use_user_credentials(creds, messages, opts)
+
+        {:error, reason} ->
+          Logger.debug("Thalamus secret not available for #{provider}: #{inspect(reason)}")
+          {:fallback, "no credentials in DB or Thalamus"}
+      end
+    else
+      {:fallback, "no organization_id in JWT claims — cannot resolve Thalamus secrets"}
     end
   end
 
@@ -111,6 +151,7 @@ defmodule CortexCommunityWeb.ChatController do
       String.contains?(model, "claude") -> "anthropic_cli"
       String.contains?(model, "gpt") -> "openai"
       String.contains?(model, "gemini") -> "google"
+      String.contains?(model, "deepseek") -> "deepseek"
       # default: usar server pool (gemini/groq)
       true -> nil
     end

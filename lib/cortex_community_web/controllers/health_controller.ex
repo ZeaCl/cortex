@@ -62,6 +62,7 @@ defmodule CortexCommunityWeb.HealthController do
     health = @cortex_core.health_status()
     workers = @cortex_core.list_workers()
     stats = CortexCommunity.StatsCollector.get_stats()
+
     provider_models =
       try do
         Repo.all(ProviderModel)
@@ -80,7 +81,9 @@ defmodule CortexCommunityWeb.HealthController do
 
     llm_workers =
       workers
-      |> Enum.filter(&(&1.type in [:gemini, :anthropic, :openai, :groq, :cohere, :xai, :ollama, :qwen_oauth]))
+      |> Enum.filter(
+        &(&1.type in [:gemini, :anthropic, :openai, :groq, :cohere, :xai, :ollama, :qwen_oauth])
+      )
       |> Enum.map(&build_worker_detail(&1, health, pm_by_name))
 
     search_workers =
