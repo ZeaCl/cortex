@@ -17,6 +17,7 @@ defmodule CortexCore.Workers.Supervisor do
     AnthropicWorker,
     BraveWorker,
     CohereWorker,
+    DeepSeekWorker,
     DuckDuckGoWorker,
     GeminiWorker,
     GroqWorker,
@@ -125,6 +126,9 @@ defmodule CortexCore.Workers.Supervisor do
   defp create_worker(:duckduckgo, name, opts),
     do: DuckDuckGoWorker.new(Keyword.put(opts, :name, name))
 
+  defp create_worker(:deepseek, name, opts),
+    do: DeepSeekWorker.new(Keyword.put(opts, :name, name))
+
   defp create_worker(:mlx, name, opts),
     do: MLXWorker.new(Keyword.put(opts, :name, name))
 
@@ -164,6 +168,7 @@ defmodule CortexCore.Workers.Supervisor do
     workers_to_register =
       []
       # LLM Workers
+      |> maybe_add_deepseek_worker(model_resolver)
       |> maybe_add_openai_worker(model_resolver)
       |> maybe_add_anthropic_worker(model_resolver)
       |> maybe_add_xai_worker(model_resolver)
@@ -401,6 +406,31 @@ defmodule CortexCore.Workers.Supervisor do
         )
 
       [{"cohere-primary", worker} | workers]
+    end
+  end
+
+  defp maybe_add_deepseek_worker(workers, model_resolver) do
+    deepseek_keys = get_env_list("DEEPSEEK_API_KEYS")
+
+    if Enum.empty?(deepseek_keys) do
+      workers
+    else
+      deepseek_model =
+        resolve_model(
+          model_resolver,
+          "deepseek-primary",
+          System.get_env("DEEPSEEK_MODEL", "deepseek-chat")
+        )
+
+      worker =
+        DeepSeekWorker.new(
+          name: "deepseek-primary",
+          api_keys: deepseek_keys,
+          model: deepseek_model,
+          timeout: 60_000
+        )
+
+      [{"deepseek-primary", worker} | workers]
     end
   end
 
