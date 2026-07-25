@@ -102,13 +102,16 @@ defmodule CortexCore.Workers.Adapters.DeepSeekWorker do
 
   def extract_content_from_chunk(json_data) do
     case Jason.decode(json_data) do
+      # Specific: deepseek-reasoner returns reasoning_content + content in delta
+      {:ok, %{"choices" => [%{"delta" => %{"reasoning_content" => _, "content" => content}} | _]}} ->
+        content
+
+      # Generic: standard delta with content (deepseek-chat, OpenAI-compatible)
       {:ok, %{"choices" => [%{"delta" => %{"content" => content}} | _]}} ->
         content
 
+      # Non-streaming: full message in response
       {:ok, %{"choices" => [%{"message" => %{"content" => content}} | _]}} ->
-        content
-
-      {:ok, %{"choices" => [%{"delta" => %{"reasoning_content" => _, "content" => content}} | _]}} ->
         content
 
       _ ->
