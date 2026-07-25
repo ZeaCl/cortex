@@ -54,6 +54,9 @@ defmodule CortexCore.Workers.Adapters.DeepSeekWorker do
   end
 
   @impl true
+  def service_type, do: :deepseek
+
+  @impl true
   def health_check(worker, http_client \\ Req) do
     APIWorkerBase.health_check(worker, http_client)
   end
