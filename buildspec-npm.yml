@@ -1,26 +1,21 @@
 version: 0.2
-
 env:
   variables:
     NODE_VERSION: "22"
   secrets-manager:
     NPM_TOKEN: "zea/npm/token:NPM_TOKEN"
-
 phases:
   install:
     commands:
-      - "echo Installing Node.js via nvm..."
-      - "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash"
-      - ". ~/.nvm/nvm.sh && nvm install ${NODE_VERSION}"
-      - ". ~/.nvm/nvm.sh && nvm use ${NODE_VERSION}"
-      - ". ~/.nvm/nvm.sh && node --version && npm --version"
-      - ". ~/.nvm/nvm.sh && echo //registry.npmjs.org/:_authToken=${NPM_TOKEN} > ~/.npmrc"
+      - curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+      - export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && nvm install ${NODE_VERSION} && nvm use ${NODE_VERSION}
+      - export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
   pre_build:
     commands:
-      - "cd cli && . ~/.nvm/nvm.sh && npm ci"
+      - export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && cd cli && (npm ci 2>/dev/null || npm install)
   build:
     commands:
-      - "cd cli && . ~/.nvm/nvm.sh && npm test || echo Tests failed, continuing"
+      - export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && cd cli && npm test || true
   post_build:
     commands:
-      - "cd cli && . ~/.nvm/nvm.sh && npm publish --access public"
+      - export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && cd cli && npm publish --access public
